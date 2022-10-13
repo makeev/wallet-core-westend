@@ -15,6 +15,8 @@ const (
 	CoinTypeBinance  CoinType = C.TWCoinTypeBinance
 	CoinTypeEthereum CoinType = C.TWCoinTypeEthereum
 	CoinTypeTron     CoinType = C.TWCoinTypeTron
+	CoinTypeWestend  CoinType = C.TWCoinTypeWestend
+	CoinTypePolkadot  CoinType = C.TWCoinTypePolkadot
 )
 
 func (c CoinType) GetName() string {

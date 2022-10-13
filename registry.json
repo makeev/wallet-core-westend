@@ -999,6 +999,33 @@
     }
   },
   {
+    "id": "westend",
+    "name": "Westend",
+    "coinId": 10000354,
+    "symbol": "WND",
+    "decimals": 12,
+    "blockchain": "Westend",
+    "derivation": [
+      {
+        "path": "m/44'/354'/0'/0'/0'"
+      }
+    ],
+    "curve": "ed25519",
+    "publicKeyType": "ed25519",
+    "addressHasher": "keccak256",
+    "explorer": {
+      "url": "https://westend.subscan.io",
+      "txPath": "/extrinsic/",
+      "accountPath": "/account/"
+    },
+    "info": {
+      "url": "https://wiki.polkadot.network/docs/maintain-networks#westend-test-network",
+      "source": "https://github.com/paritytech/polkadot",
+      "rpc": "wss://westend-rpc.polkadot.io",
+      "documentation": "https://polkadot.js.org/api/substrate/rpc.html"
+    }
+  },
+  {
     "id": "everscale",
     "name": "Everscale",
     "coinId": 396,

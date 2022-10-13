@@ -3,127 +3,80 @@ package main
 import (
 	"encoding/hex"
 	"fmt"
-	"math"
 	"math/big"
 	"tw/core"
-	"tw/protos/bitcoin"
-	"tw/protos/common"
-	"tw/protos/ethereum"
-	"tw/sample"
+	"tw/protos/polkadot"
 )
 
 func main() {
 	fmt.Println("==> calling wallet core from go")
 
-	mn := "confirm bleak useless tail chalk destroy horn step bulb genuine attract split"
+	// можем создать кошелек из mnemonic или seed, но только по схеме ed25519(polkadot по умолчанию sr25519)
+	mn := "excess shift gym east salmon ghost enroll winner document library pen minimum"
 
 	fmt.Println("==> mnemonic is valid: ", core.IsMnemonicValid(mn))
 
-	// bitcoin wallet
-	bw, err := core.CreateWalletWithMnemonic(mn, core.CoinTypeBitcoin)
-	if err != nil {
-		panic(err)
-	}
-	printWallet(bw)
+	coin := core.CoinTypeWestend
 
-	// ethereum wallet
-	ew, err := core.CreateWalletWithMnemonic(mn, core.CoinTypeEthereum)
-	if err != nil {
-		panic(err)
-	}
-	printWallet(ew)
+	// coin details
+	fmt.Println(coin.GetName())
+	fmt.Println(coin.Decimals())
 
-	// tron wallet
-	tw, err := core.CreateWalletWithMnemonic(mn, core.CoinTypeTron)
-	if err != nil {
-		panic(err)
-	}
-	printWallet(tw)
+	w, _ := core.CreateWalletWithMnemonic(mn, coin)
+	printWallet(w)
 
-	// Ethereum transaction
-	ethTxn := createEthTransaction(ew)
-	fmt.Println("Ethereum signed tx:")
-	fmt.Println("\t", ethTxn)
+	fromAddress := w.Address
+	fmt.Println("From: ", fromAddress)
 
-	// Bitcion transaction
-	btcTxn := createBtcTransaction(bw)
-	fmt.Println("\nBitcoin signed tx:")
-	fmt.Println("\t", btcTxn)
+	// будет разный, для разных сетей, можно получить через rpc call
+	genesisHash, _ := hex.DecodeString("e143f23803ac50e8f6f8e62695d1ce9e4e1d68aa36c1cd2cfd15340213f3423e")
+	fmt.Println("Genesis hash:", genesisHash)
 
-	sample.ExternalSigningDemo()
-}
+	// ключ кошелька, которым будем подписывать
+	priKeyByte, _ := hex.DecodeString(w.PriKey)
+	fmt.Println("Private key:", priKeyByte)
 
-func createEthTransaction(ew *core.Wallet) string {
-	priKeyByte, _ := hex.DecodeString(ew.PriKey)
+	// последний блок тоже достается через rpc call
+	blockHash, _ := hex.DecodeString("90d81701b3c3d38eb9aa54e2f6fa167e2e7fc21e154cf91fabdcca7bf58164e2")
+	toAddress := "5FPJXVP6C8h53epLDm74PxCNQTHSiCXsgqFEbt5Z1eFikX9j"
 
-	input := ethereum.SigningInput{
-		ChainId:    big.NewInt(4).Bytes(), // mainnet: 1, rinkeby: 4 https://chainlist.org/
-		Nonce:      big.NewInt(0).Bytes(), // get nonce from network
-		TxMode:     ethereum.TransactionMode_Legacy,
-		GasPrice:   big.NewInt(100000000000).Bytes(), // 100 gwei
-		GasLimit:   big.NewInt(21000).Bytes(),
-		ToAddress:  "0xE9B511C0753649E5F3E78Ed8AdBEE92d0d2Db384",
+	input := polkadot.SigningInput{
+		BlockHash:          blockHash,
+		GenesisHash:        genesisHash,
+		Nonce:              3,
+		SpecVersion:        9300,
+		TransactionVersion: 13,
+		Tip:                big.NewInt(100).Bytes(),
+		Era: &polkadot.Era{
+			BlockNumber: 12861317,
+			Period:      64,
+		},
 		PrivateKey: priKeyByte,
-		Transaction: &ethereum.Transaction{
-			TransactionOneof: &ethereum.Transaction_Transfer_{
-				Transfer: &ethereum.Transaction_Transfer{
-					// amount should be in wei unit, eth * (10^decimals) = wei
-					Amount: big.NewInt(int64(
-						0.01 * math.Pow10(ew.CoinType.Decimals()),
-					)).Bytes(),
-					Data: []byte{},
+		Network:    polkadot.Network_WESTEND,
+		MessageOneof: &polkadot.SigningInput_BalanceCall{
+			BalanceCall: &polkadot.Balance{
+				MessageOneof: &polkadot.Balance_Transfer_{
+					Transfer: &polkadot.Balance_Transfer{
+						ToAddress: toAddress,
+						Value:     big.NewInt(10000).Bytes(),
+					},
 				},
 			},
 		},
 	}
 
-	var output ethereum.SigningOutput
-	err := core.CreateSignedTx(&input, ew.CoinType, &output)
-	if err != nil {
-		panic(err)
-	}
-	return hex.EncodeToString(output.GetEncoded())
-}
+	fmt.Println(input.String())
 
-func createBtcTransaction(bw *core.Wallet) string {
-	lockScript := core.BitcoinScriptLockScriptForAddress(bw.Address, bw.CoinType)
-	fmt.Println("\nBitcoin address lock script:")
-	fmt.Println("\t", hex.EncodeToString(lockScript))
-
-	utxoHash, _ := hex.DecodeString("fff7f7881a8099afa6940d42d1e7f6362bec38171ea3edf433541db4e4ad969f")
-
-	utxo := bitcoin.UnspentTransaction{
-		OutPoint: &bitcoin.OutPoint{
-			Hash:     utxoHash,
-			Index:    0,
-			Sequence: 4294967295,
-		},
-		Amount: 625000000,
-		Script: lockScript,
+	var output polkadot.SigningOutput
+	output_err := core.CreateSignedTx(&input, coin, &output)
+	if output_err != nil {
+		panic(output_err)
 	}
 
-	priKeyByte, _ := hex.DecodeString(bw.PriKey)
-
-	input := bitcoin.SigningInput{
-		HashType:      uint32(core.BitcoinSigHashTypeAll),
-		Amount:        1000000,
-		ByteFee:       1,
-		ToAddress:     "1Bp9U1ogV3A14FMvKbRJms7ctyso4Z4Tcx",
-		ChangeAddress: "1FQc5LdgGHMHEN9nwkjmz6tWkxhPpxBvBU",
-		PrivateKey:    [][]byte{priKeyByte},
-		Utxo:          []*bitcoin.UnspentTransaction{&utxo},
-		CoinType:      uint32(core.CoinTypeBitcoin),
-	}
-
-	var output bitcoin.SigningOutput
-	err := core.CreateSignedTx(&input, bw.CoinType, &output)
-	if err != nil {
-		panic(err)
-	}
-	if output.GetError() != common.SigningError_OK {
-		panic(output.GetError().String())
-	}
-	return hex.EncodeToString(output.GetEncoded())
+	fmt.Println("")
+	// тут бует tx-hash, используя c++ и Extrinsic.h можно отдельно генерить
+	// payload и подпись, либо написать функцию чтобы бробросить через cgo
+	fmt.Println(hex.EncodeToString(output.GetEncoded()))
 }
 
 func printWallet(w *core.Wallet) {
